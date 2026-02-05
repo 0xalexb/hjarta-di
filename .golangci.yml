@@ -1,0 +1,45 @@
+version: "2"
+
+linters:
+  default: all
+  disable:
+    - testpackage
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - err113
+          - funlen
+          - exhaustruct
+  settings:
+    depguard:
+      rules:
+        main:
+          list-mode: strict
+          files:
+            - $all
+            - "!$test"
+          allow:
+            # standard library
+            - $gostd
+            # personal repos
+            - github.com/0xalexb
+            # DI
+            - go.uber.org/fx
+            # YAML parsing
+            - github.com/goccy/go-yaml
+        tests:
+          list-mode: strict
+          files:
+            - $test
+          allow:
+            #standard library
+            - $gostd
+            # personal repos
+            - github.com/0xalexb
+            # DI
+            - go.uber.org/fx
+            # test libraries
+            - github.com/stretchr/testify
+            # YAML parsing
+            - github.com/goccy/go-yaml
