@@ -65,6 +65,42 @@ func (s *ServerService) Address() string {
 	return fmt.Sprintf("%s:%d", s.Config.Host, s.Config.Port)
 }
 
+// Example_versionInformation demonstrates how to access build-time version variables.
+// These values default to "dev"/"unknown" and can be overridden via ldflags at build time.
+func Example_versionInformation() {
+	fmt.Printf("Version: %s\n", di.Version)
+	fmt.Printf("DIVersion: %s\n", di.DIVersion)
+	fmt.Printf("CompiledAt: %s\n", di.CompiledAt)
+	// Output:
+	// Version: dev
+	// DIVersion: dev
+	// CompiledAt: unknown
+}
+
+// Example_appRun demonstrates how to use app.Run() for blocking execution with graceful shutdown.
+// Run() blocks until an OS signal or fx.Shutdowner triggers shutdown.
+func Example_appRun() {
+	module := fx.Module("app",
+		fx.Invoke(func(shutdowner fx.Shutdowner) {
+			go func() {
+				_ = shutdowner.Shutdown()
+			}()
+		}),
+	)
+
+	app := di.NewApp(
+		di.WithLogLevel("error"),
+		di.WithModules(module),
+	)
+
+	fmt.Println("Starting app...")
+	app.Run()
+	fmt.Println("App stopped gracefully.")
+	// Output:
+	// Starting app...
+	// App stopped gracefully.
+}
+
 // Example_appWithConfigIntegration demonstrates how to use App, Options, and Config together.
 // It shows the complete workflow from defining configuration to dependency injection.
 func Example_appWithConfigIntegration() {
