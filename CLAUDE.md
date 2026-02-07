@@ -24,11 +24,13 @@ No Makefile - use standard Go commands.
 Three packages with distinct responsibilities:
 
 ### `di` (root package)
-- `App` wrapper around `fx.App` with Start/Stop lifecycle management
+- `App` wrapper around `fx.App` with Start/Stop/Run lifecycle management
+- `Run()` blocks until OS signal (SIGINT/SIGTERM) then shuts down gracefully; logs error and returns immediately on nil receiver
 - Uses Option pattern for configuration (`WithModules`, `WithLogLevel`)
 - Automatically supplies `*slog.Logger` and `logging.LoggerConfig` to DI container
 - Sets created logger as default via `slog.SetDefault()`
 - Entry point: `NewApp(options...)` returns `*App`
+- `version.go`: build-time variables (`Version`, `DIVersion`, `CompiledAt`) settable via `-ldflags`
 
 ### `logging`
 - Creates `*slog.Logger` instances with JSON handler

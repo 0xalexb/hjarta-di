@@ -68,6 +68,17 @@ func (app *App) Start() error {
 	return errAppNotInitialized
 }
 
+// Run starts the application and blocks until an OS signal is received, then shuts down gracefully.
+func (app *App) Run() {
+	if app == nil || app.app == nil {
+		slog.Error("attempted to run an uninitialized app")
+
+		return
+	}
+
+	app.app.Run()
+}
+
 // Stop stops the Fx application gracefully.
 func (app *App) Stop() error {
 	if app != nil && app.app != nil {

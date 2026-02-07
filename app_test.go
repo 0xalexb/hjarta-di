@@ -255,3 +255,32 @@ func TestApp_StartOnNilApp(t *testing.T) {
 	err := app.Start()
 	require.Error(t, err)
 }
+
+func TestApp_RunOnNilApp(t *testing.T) {
+	t.Parallel()
+
+	var app *di.App
+
+	require.NotPanics(t, func() {
+		app.Run()
+	})
+}
+
+func TestApp_Run(t *testing.T) {
+	t.Parallel()
+
+	module := fx.Module("test",
+		fx.Invoke(func(shutdowner fx.Shutdowner) {
+			go func() {
+				_ = shutdowner.Shutdown()
+			}()
+		}),
+	)
+
+	app := di.NewApp(di.WithModules(module))
+	require.NotNil(t, app)
+
+	require.NotPanics(t, func() {
+		app.Run()
+	})
+}
