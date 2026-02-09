@@ -35,7 +35,7 @@ func NewApp(opts ...Option) *App {
 }
 
 func configure(options *Options) *fx.App {
-	logger := createLogger(options.LogLevel, os.Stdout)
+	logger := createLogger(options.LogLevel, os.Stderr)
 	slog.SetDefault(logger)
 
 	return fx.New(
