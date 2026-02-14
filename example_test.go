@@ -1,12 +1,17 @@
 package di_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
 
 	di "github.com/0xalexb/hjarta-di"
 	"github.com/0xalexb/hjarta-di/config"
 	filefetcher "github.com/0xalexb/hjarta-di/config/fetcher/file"
+	"github.com/0xalexb/hjarta-di/listener"
 	yamlparser "github.com/0xalexb/hjarta-di/config/parser/yaml"
 
 	"go.uber.org/fx"
@@ -160,4 +165,61 @@ func Example_appWithConfigIntegration() {
 	// Output:
 	// Server address: api.example.com:9000
 	// Timeout: 30
+}
+
+// Example_appWithHTTPListener demonstrates how to use WithHTTPListener to create
+// an app with a named HTTP listener, make a request, and shut down gracefully.
+func Example_appWithHTTPListener() {
+	// Find a free port.
+	freePortListener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		fmt.Printf("Error finding free port: %v\n", err)
+
+		return
+	}
+
+	addr := freePortListener.Addr().String()
+	_ = freePortListener.Close()
+
+	// Provide a named http.Handler for the "api" listener.
+	handlerModule := fx.Module("handler",
+		fx.Provide(
+			fx.Annotate(
+				func() http.Handler {
+					return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+						_, _ = fmt.Fprint(w, "hello from listener")
+					})
+				},
+				fx.ResultTags(`name:"api"`),
+			),
+		),
+	)
+
+	app := di.NewApp(
+		di.WithLogLevel("error"),
+		di.WithModules(handlerModule),
+		di.WithHTTPListener("api", listener.WithAddress(addr)),
+	)
+
+	err = app.Start()
+	if err != nil {
+		fmt.Printf("Error starting app: %v\n", err)
+
+		return
+	}
+
+	defer func() { _ = app.Stop() }()
+
+	resp, err := http.Get("http://" + addr + "/") //nolint:noctx // example test, context not needed
+	if err != nil {
+		fmt.Printf("Error making request: %v\n", err)
+
+		return
+	}
+	defer resp.Body.Close() //nolint:errcheck // example test
+
+	body, _ := io.ReadAll(resp.Body)
+	fmt.Println(string(body))
+	// Output:
+	// hello from listener
 }

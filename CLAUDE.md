@@ -21,12 +21,12 @@ No Makefile - use standard Go commands.
 
 ## Architecture
 
-Three packages with distinct responsibilities:
+Four packages with distinct responsibilities:
 
 ### `di` (root package)
 - `App` wrapper around `fx.App` with Start/Stop/Run lifecycle management
 - `Run()` blocks until OS signal (SIGINT/SIGTERM) then shuts down gracefully; logs error and returns immediately on nil receiver
-- Uses Option pattern for configuration (`WithModules`, `WithLogLevel`)
+- Uses Option pattern for configuration (`WithModules`, `WithLogLevel`, `WithHTTPListener`)
 - Automatically supplies `*slog.Logger` and `logging.LoggerConfig` to DI container
 - Sets created logger as default via `slog.SetDefault()`
 - Entry point: `NewApp(options...)` returns `*App`
@@ -58,6 +58,19 @@ Three packages with distinct responsibilities:
 - Exports `ErrPathIsDirectory` sentinel error for `errors.Is()` checking
 - Constructor: `NewFetcher(filepath string)` returns `func() (*Fetcher, error)`
 
+### `listener`
+- Named HTTP listener Fx modules with lifecycle management
+- `NewModule(name string, opts ...Option)` creates an `fx.Module` for a named HTTP listener; returns `fx.Error` if name is empty
+- The name serves as both the Fx module name and the DI named tag for `http.Handler` and `Config`
+- Config can be provided via options (`WithAddress`) or externally via DI (e.g., `config.Provider`)
+- `NewServer(name, handler, cfg, onServeErr)` returns `(*Server, error)`; validates name is not empty, handler is not nil, and config via `Validate()`
+- `Server` struct with `Start(ctx)` / `Stop(ctx)` methods manages `http.Server` lifecycle
+- Serve errors propagate via `fx.Shutdowner` callback to trigger graceful app shutdown
+- Sentinel errors: `ErrEmptyAddress`, `ErrListenFailed`, `ErrShutdownFailed`, `ErrEmptyName`, `ErrNilHandler`
+- DI wiring in `di.go`, server logic in `server.go`, config/options in their own files
+- Multiple listeners with different names can coexist
+- Integrates with root `di` package via `WithHTTPListener(name, opts...)` option
+
 ## Key Patterns
 
 ### Option Pattern
@@ -66,6 +79,7 @@ The `di` package uses functional options:
 app := di.NewApp(
     di.WithModules(myModule),
     di.WithLogLevel("info"),
+    di.WithHTTPListener("api", listener.WithAddress(":8080")),
 )
 ```
 
