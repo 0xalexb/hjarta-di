@@ -1,6 +1,10 @@
 package di
 
-import "go.uber.org/fx"
+import (
+	"github.com/0xalexb/hjarta-di/listener"
+
+	"go.uber.org/fx"
+)
 
 // Options holds configuration settings for the application.
 type Options struct {
@@ -15,6 +19,16 @@ type Option func(*Options)
 func WithModules(modules ...fx.Option) Option {
 	return func(opts *Options) {
 		opts.Modules = append(opts.Modules, modules...)
+	}
+}
+
+// WithHTTPListener adds a named HTTP listener module to the application.
+// The name is used as both the Fx module name and the DI named tag for http.Handler and Config.
+// When options are provided (e.g., WithAddress), Config is supplied to DI automatically.
+// Call multiple times with different names to create multiple listeners.
+func WithHTTPListener(name string, opts ...listener.Option) Option {
+	return func(o *Options) {
+		o.Modules = append(o.Modules, listener.NewModule(name, opts...))
 	}
 }
 
