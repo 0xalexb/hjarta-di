@@ -21,7 +21,7 @@ No Makefile - use standard Go commands.
 
 ## Architecture
 
-Four packages with distinct responsibilities:
+Packages with distinct responsibilities:
 
 ### `di` (root package)
 - `App` wrapper around `fx.App` with Start/Stop/Run lifecycle management
@@ -70,6 +70,21 @@ Four packages with distinct responsibilities:
 - DI wiring in `di.go`, server logic in `server.go`, config/options in their own files
 - Multiple listeners with different names can coexist
 - Integrates with root `di` package via `WithHTTPListener(name, opts...)` option
+
+#### `listener/middleware`
+- HTTP middleware factory functions returning `func(http.Handler) http.Handler`
+- All middlewares use stdlib only (no external dependencies)
+- Logging middlewares use global slog (via `slog.SetDefault` in di package)
+- Compatible with go-pkgz/routegroup for middleware composition
+- Available middlewares:
+  - `RequestID()` - generates 16-hex-char random request IDs via crypto/rand; reuses existing `X-Request-ID` header; stores in context via `GetRequestID(ctx)`
+  - `Recovery()` - catches panics, logs stack trace via slog.Error (includes request ID if available), returns 500
+  - `Logging()` - logs method, path, status, duration, request ID; Info for 2xx/3xx, Warn for 4xx, Error for 5xx
+  - `CORS(cfg CORSConfig)` - configurable CORS with preflight handling, origin matching, wildcard support, credentials flag; if AllowCredentials is true with only wildcard origins, disables credentials and logs slog.Warn
+  - `Timeout(duration time.Duration)` - wraps http.TimeoutHandler, returns 503 on timeout; defaults to 30s with slog.Warn if duration <= 0
+  - `RateLimit(requestsPerSecond float64, burst int)` - global token bucket rate limiter, returns 429 with Retry-After header; defaults requestsPerSecond to 1.0 and burst to 1 with slog.Warn if <= 0
+  - `MaxRequestSize(bytes int64)` - wraps body with http.MaxBytesReader, returns 413 when exceeded; defaults to 1MB (1048576) with slog.Warn if bytes <= 0
+  - `Compress()` - gzip compression when client supports it; skips small responses and already-compressed content types
 
 ## Key Patterns
 

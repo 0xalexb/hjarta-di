@@ -151,7 +151,7 @@ func TestWithHTTPListener_WithAddress(t *testing.T) {
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://"+addr, nil)
 	require.NoError(t, err)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req) //nolint:gosec // G704: test code, URL from test server
 	require.NoError(t, err)
 
 	defer func() { _ = resp.Body.Close() }()
@@ -187,7 +187,7 @@ func TestWithHTTPListener_ExternalConfig(t *testing.T) {
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://"+addr, nil)
 	require.NoError(t, err)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req) //nolint:gosec // G704: test code, URL from test server
 	require.NoError(t, err)
 
 	defer func() { _ = resp.Body.Close() }()
@@ -226,7 +226,7 @@ func TestWithHTTPListener_MultipleListeners(t *testing.T) {
 	req1, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://"+addr1, nil)
 	require.NoError(t, err)
 
-	resp1, err := http.DefaultClient.Do(req1)
+	resp1, err := http.DefaultClient.Do(req1) //nolint:gosec // G704: test code, URL from test server
 	require.NoError(t, err)
 
 	defer func() { _ = resp1.Body.Close() }()
@@ -237,7 +237,7 @@ func TestWithHTTPListener_MultipleListeners(t *testing.T) {
 	req2, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://"+addr2, nil)
 	require.NoError(t, err)
 
-	resp2, err := http.DefaultClient.Do(req2)
+	resp2, err := http.DefaultClient.Do(req2) //nolint:gosec // G704: test code, URL from test server
 	require.NoError(t, err)
 
 	defer func() { _ = resp2.Body.Close() }()
