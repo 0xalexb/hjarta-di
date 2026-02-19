@@ -17,7 +17,7 @@ func TestRateLimit_RequestsWithinLimit(t *testing.T) { //nolint:paralleltest // 
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	for i := range 5 { //nolint:varnamelen // i is conventional for loop index
+	for i := range 5 {
 		rr := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 
@@ -41,7 +41,7 @@ func TestRateLimit_ExceedingLimitReturns429(t *testing.T) { //nolint:paralleltes
 	}
 
 	// Next request should be rate limited.
-	rr := httptest.NewRecorder() //nolint:varnamelen // rr is conventional for recorder
+	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	handler.ServeHTTP(rr, req)
 
@@ -56,7 +56,7 @@ func TestRateLimit_TokenReplenishmentOverTime(t *testing.T) { //nolint:parallelt
 	}))
 
 	// Use the single burst token.
-	rr := httptest.NewRecorder() //nolint:varnamelen // rr is conventional for httptest.ResponseRecorder
+	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	handler.ServeHTTP(rr, req)
 	require.Equal(t, http.StatusOK, rr.Code)
@@ -84,7 +84,7 @@ func TestRateLimit_RetryAfterHeader(t *testing.T) { //nolint:paralleltest // use
 	}))
 
 	// Exhaust tokens.
-	rr := httptest.NewRecorder() //nolint:varnamelen // rr is conventional for recorder
+	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	handler.ServeHTTP(rr, req)
 	require.Equal(t, http.StatusOK, rr.Code)
@@ -108,7 +108,7 @@ func TestRateLimit_PassesThroughToHandler(t *testing.T) { //nolint:paralleltest 
 		_, _ = w.Write([]byte("created"))
 	}))
 
-	rr := httptest.NewRecorder() //nolint:varnamelen // rr is conventional for recorder
+	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/resource", nil)
 	handler.ServeHTTP(rr, req)
 

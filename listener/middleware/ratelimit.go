@@ -18,7 +18,7 @@ type tokenBucket struct {
 }
 
 func newTokenBucket(requestsPerSecond float64, burst int) *tokenBucket {
-	return &tokenBucket{ //nolint:exhaustruct
+	return &tokenBucket{
 		tokens:         float64(burst),
 		maxTokens:      float64(burst),
 		refillRate:     requestsPerSecond,
@@ -68,7 +68,7 @@ func RateLimit(requestsPerSecond float64, burst int) func(http.Handler) http.Han
 	bucket := newTokenBucket(requestsPerSecond, burst)
 
 	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:varnamelen
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			allowed, retryAfter := bucket.tryAcquire()
 			if !allowed {
 				seconds := max(int(math.Ceil(retryAfter.Seconds())), 1)

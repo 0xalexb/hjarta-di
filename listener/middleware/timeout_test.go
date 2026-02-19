@@ -37,7 +37,7 @@ func TestTimeout_RequestExceedsTimeout(t *testing.T) { //nolint:paralleltest // 
 		}
 	}))
 
-	rr := httptest.NewRecorder() //nolint:varnamelen // rr is conventional for httptest.ResponseRecorder
+	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/slow", nil)
 
 	handler.ServeHTTP(rr, req)

@@ -22,7 +22,7 @@ func TestMaxRequestSize_SmallBodyPasses(t *testing.T) {
 		_, _ = w.Write(body)
 	}))
 
-	rr := httptest.NewRecorder() //nolint:varnamelen // rr is conventional for recorder
+	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader("small body"))
 
 	handler.ServeHTTP(rr, req)
@@ -34,7 +34,6 @@ func TestMaxRequestSize_SmallBodyPasses(t *testing.T) {
 func TestMaxRequestSize_OversizedBodyReturns413(t *testing.T) {
 	t.Parallel()
 
-	//nolint:varnamelen // w, r are conventional for http handler params.
 	handler := MaxRequestSize(10)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -46,7 +45,7 @@ func TestMaxRequestSize_OversizedBodyReturns413(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	rr := httptest.NewRecorder() //nolint:varnamelen // rr is conventional
+	rr := httptest.NewRecorder()
 	body := strings.Repeat("x", 100)
 	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(body))
 
@@ -59,7 +58,6 @@ func TestMaxRequestSize_ExactLimitPasses(t *testing.T) {
 	t.Parallel()
 
 	limit := int64(10)
-	//nolint:varnamelen // w is conventional for http.ResponseWriter.
 	handler := MaxRequestSize(limit)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -72,7 +70,7 @@ func TestMaxRequestSize_ExactLimitPasses(t *testing.T) {
 		_, _ = w.Write(body)
 	}))
 
-	rr := httptest.NewRecorder() //nolint:varnamelen // rr is conventional for recorder
+	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader("0123456789"))
 
 	handler.ServeHTTP(rr, req)
@@ -89,7 +87,7 @@ func TestMaxRequestSize_NoBodyPasses(t *testing.T) {
 		_, _ = w.Write([]byte("ok"))
 	}))
 
-	rr := httptest.NewRecorder() //nolint:varnamelen // rr is conventional for recorder
+	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/no-body", nil)
 
 	handler.ServeHTTP(rr, req)

@@ -24,7 +24,6 @@ type captureHandler struct {
 
 func (h *captureHandler) Enabled(_ context.Context, _ slog.Level) bool { return true }
 
-//nolint:varnamelen // r is conventional for slog.Record.
 func (h *captureHandler) Handle(_ context.Context, r slog.Record) error {
 	rec := logRecord{
 		Level:   r.Level,
@@ -60,8 +59,7 @@ func setupTestLogger(t *testing.T) *captureHandler {
 }
 
 func TestLogging_LogFields(t *testing.T) { //nolint:paralleltest // modifies global slog default
-	h := setupTestLogger(t) //nolint:varnamelen // h is conventional for handler
-
+	h := setupTestLogger(t)
 	handler := Logging()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -85,8 +83,7 @@ func TestLogging_LogFields(t *testing.T) { //nolint:paralleltest // modifies glo
 }
 
 func TestLogging_InfoLevelForSuccess(t *testing.T) { //nolint:paralleltest // modifies global slog default
-	h := setupTestLogger(t) //nolint:varnamelen // h is conventional for handler
-
+	h := setupTestLogger(t)
 	handler := Logging()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -101,8 +98,7 @@ func TestLogging_InfoLevelForSuccess(t *testing.T) { //nolint:paralleltest // mo
 }
 
 func TestLogging_WarnLevelFor4xx(t *testing.T) { //nolint:paralleltest // modifies global slog default
-	h := setupTestLogger(t) //nolint:varnamelen // h is conventional for handler
-
+	h := setupTestLogger(t)
 	handler := Logging()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
@@ -118,8 +114,7 @@ func TestLogging_WarnLevelFor4xx(t *testing.T) { //nolint:paralleltest // modifi
 }
 
 func TestLogging_ErrorLevelFor5xx(t *testing.T) { //nolint:paralleltest // modifies global slog default
-	h := setupTestLogger(t) //nolint:varnamelen // h is conventional for handler
-
+	h := setupTestLogger(t)
 	handler := Logging()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
@@ -135,8 +130,7 @@ func TestLogging_ErrorLevelFor5xx(t *testing.T) { //nolint:paralleltest // modif
 }
 
 func TestLogging_DurationTracking(t *testing.T) { //nolint:paralleltest // modifies global slog default
-	h := setupTestLogger(t) //nolint:varnamelen // h is conventional for handler
-
+	h := setupTestLogger(t)
 	handler := Logging()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		time.Sleep(10 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
@@ -155,8 +149,7 @@ func TestLogging_DurationTracking(t *testing.T) { //nolint:paralleltest // modif
 }
 
 func TestLogging_IncludesRequestID(t *testing.T) { //nolint:paralleltest // modifies global slog default
-	h := setupTestLogger(t) //nolint:varnamelen // h is conventional for handler
-
+	h := setupTestLogger(t)
 	handler := Logging()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -174,8 +167,7 @@ func TestLogging_IncludesRequestID(t *testing.T) { //nolint:paralleltest // modi
 }
 
 func TestLogging_NoRequestID(t *testing.T) { //nolint:paralleltest // modifies global slog default
-	h := setupTestLogger(t) //nolint:varnamelen // h is conventional for handler
-
+	h := setupTestLogger(t)
 	handler := Logging()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -191,8 +183,7 @@ func TestLogging_NoRequestID(t *testing.T) { //nolint:paralleltest // modifies g
 }
 
 func TestLogging_ImplicitOKStatus(t *testing.T) { //nolint:paralleltest // modifies global slog default
-	h := setupTestLogger(t) //nolint:varnamelen // h is conventional for handler
-
+	h := setupTestLogger(t)
 	handler := Logging()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("hello"))
 	}))

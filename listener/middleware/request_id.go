@@ -61,12 +61,13 @@ func isPrintableASCII(s string) bool {
 // and set as the X-Request-ID response header.
 func RequestID() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:varnamelen
-			id := r.Header.Get(RequestIDHeader) //nolint:varnamelen
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			id := r.Header.Get(RequestIDHeader)
 			if id == "" || len(id) > maxRequestIDLength || !isPrintableASCII(id) {
 				id = generateRequestID()
 			}
 
+			r.Header.Set(RequestIDHeader, id)
 			w.Header().Set(RequestIDHeader, id)
 
 			ctx := context.WithValue(r.Context(), requestIDKey, id)

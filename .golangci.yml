@@ -4,14 +4,29 @@ linters:
   default: all
   disable:
     - testpackage
+    - exhaustruct
   exclusions:
     rules:
       - path: _test\.go
         linters:
           - err113
           - funlen
-          - exhaustruct
   settings:
+    varnamelen:
+      ignore-names:
+        - rr
+        - tt
+        - gz
+        - sw
+        - id
+        - grw
+        - i
+      ignore-decls:
+        - w http.ResponseWriter
+        - r *http.Request
+        - b []byte
+        - h *captureHandler
+        - r slog.Record
     depguard:
       rules:
         main:

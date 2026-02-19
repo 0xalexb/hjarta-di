@@ -23,7 +23,7 @@ func TestCompress_GzipResponseWhenAccepted(t *testing.T) {
 		_, _ = w.Write([]byte(body))
 	}))
 
-	rr := httptest.NewRecorder() //nolint:varnamelen // rr is conventional for recorder
+	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
 
@@ -54,7 +54,7 @@ func TestCompress_NoCompressionWhenNotAccepted(t *testing.T) {
 		_, _ = w.Write([]byte(body))
 	}))
 
-	rr := httptest.NewRecorder() //nolint:varnamelen // rr is conventional for recorder
+	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 
 	handler.ServeHTTP(rr, req)
@@ -75,7 +75,7 @@ func TestCompress_ProperHeaders(t *testing.T) {
 		_, _ = w.Write([]byte(body))
 	}))
 
-	rr := httptest.NewRecorder() //nolint:varnamelen // rr is conventional for recorder
+	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/data", nil)
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
 
@@ -97,7 +97,7 @@ func TestCompress_SkipSmallResponses(t *testing.T) {
 		_, _ = w.Write([]byte(body))
 	}))
 
-	rr := httptest.NewRecorder() //nolint:varnamelen // rr is conventional for recorder
+	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
 
@@ -123,7 +123,7 @@ func TestCompress_SkipAlreadyCompressedContentTypes(t *testing.T) {
 		{"pdf", "application/pdf"},
 	}
 
-	for _, tt := range tests { //nolint:varnamelen // subtests share table-driven test data.
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -135,7 +135,7 @@ func TestCompress_SkipAlreadyCompressedContentTypes(t *testing.T) {
 				_, _ = w.Write([]byte(body))
 			}))
 
-			rr := httptest.NewRecorder() //nolint:varnamelen // rr is conventional
+			rr := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
 			req.Header.Set("Accept-Encoding", "gzip")
 
@@ -159,7 +159,7 @@ func TestCompress_ContentTypeWithCharset(t *testing.T) {
 		_, _ = w.Write([]byte(body))
 	}))
 
-	rr := httptest.NewRecorder() //nolint:varnamelen // rr is conventional for recorder
+	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
 
@@ -188,7 +188,7 @@ func TestCompress_ImplicitWriteHeader(t *testing.T) {
 		_, _ = w.Write([]byte(body))
 	}))
 
-	rr := httptest.NewRecorder() //nolint:varnamelen // rr is conventional for recorder
+	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
 
@@ -251,7 +251,7 @@ func TestCompress_GzipQZeroNotCompressed(t *testing.T) {
 		_, _ = w.Write([]byte(body))
 	}))
 
-	rr := httptest.NewRecorder() //nolint:varnamelen // rr is conventional for recorder
+	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip;q=0, deflate")
 
@@ -276,7 +276,7 @@ func TestCompress_MultipleWriteCalls(t *testing.T) {
 		}
 	}))
 
-	rr := httptest.NewRecorder() //nolint:varnamelen // rr is conventional for recorder
+	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
 
@@ -307,7 +307,7 @@ func TestCompress_SkipExistingContentEncoding(t *testing.T) {
 		_, _ = w.Write([]byte(body))
 	}))
 
-	rr := httptest.NewRecorder() //nolint:varnamelen // rr is conventional for recorder
+	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
 
@@ -325,7 +325,7 @@ func TestCompress_SkipNoContentStatus(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 
-	rr := httptest.NewRecorder() //nolint:varnamelen // rr is conventional for recorder
+	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
 
@@ -342,7 +342,7 @@ func TestCompress_SkipNotModifiedStatus(t *testing.T) {
 		w.WriteHeader(http.StatusNotModified)
 	}))
 
-	rr := httptest.NewRecorder() //nolint:varnamelen // rr is conventional for recorder
+	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
 
@@ -364,7 +364,7 @@ func TestCompress_SkipPartialContentStatus(t *testing.T) {
 		_, _ = w.Write([]byte(body))
 	}))
 
-	rr := httptest.NewRecorder() //nolint:varnamelen // rr is conventional for recorder
+	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Accept-Encoding", "gzip")
 

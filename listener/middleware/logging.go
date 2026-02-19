@@ -12,8 +12,9 @@ import (
 type statusWriter struct {
 	http.ResponseWriter
 
-	status int
-	written bool
+	status   int
+	written  bool
+	hijacked bool
 }
 
 func (w *statusWriter) WriteHeader(code int) {
@@ -25,7 +26,7 @@ func (w *statusWriter) WriteHeader(code int) {
 	}
 }
 
-func (w *statusWriter) Write(b []byte) (int, error) { //nolint:varnamelen
+func (w *statusWriter) Write(b []byte) (int, error) {
 	if !w.written {
 		w.status = http.StatusOK
 		w.written = true
@@ -41,7 +42,12 @@ func (w *statusWriter) Write(b []byte) (int, error) { //nolint:varnamelen
 func (w *statusWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	rc := http.NewResponseController(w.ResponseWriter)
 
-	return rc.Hijack() //nolint:wrapcheck
+	conn, buf, err := rc.Hijack()
+	if err == nil {
+		w.hijacked = true
+	}
+
+	return conn, buf, err //nolint:wrapcheck
 }
 
 // Flush delegates to the underlying ResponseWriter via http.ResponseController,
@@ -67,15 +73,19 @@ func (w *statusWriter) Unwrap() http.ResponseWriter {
 // Log level is Info for 2xx/3xx, Warn for 4xx, Error for 5xx.
 func Logging() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:varnamelen
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 
-			sw := &statusWriter{ResponseWriter: w} //nolint:exhaustruct,varnamelen
+			sw := &statusWriter{ResponseWriter: w}
 
 			next.ServeHTTP(sw, r)
 
 			if sw.status == 0 {
-				sw.status = http.StatusOK
+				if sw.hijacked {
+					sw.status = http.StatusSwitchingProtocols
+				} else {
+					sw.status = http.StatusOK
+				}
 			}
 
 			duration := time.Since(start)

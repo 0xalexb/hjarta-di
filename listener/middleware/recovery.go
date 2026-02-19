@@ -69,8 +69,8 @@ func (w *recoveryWriter) Unwrap() http.ResponseWriter {
 // written, it logs an error instead of attempting to write a 500 status.
 func Recovery() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:varnamelen
-			recWriter := &recoveryWriter{ResponseWriter: w} //nolint:exhaustruct
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			recWriter := &recoveryWriter{ResponseWriter: w}
 
 			defer func() { //nolint:contextcheck
 				if rec := recover(); rec != nil {

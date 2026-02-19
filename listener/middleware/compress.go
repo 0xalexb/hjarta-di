@@ -75,7 +75,7 @@ func (w *gzipResponseWriter) WriteHeader(code int) {
 	}
 }
 
-func (w *gzipResponseWriter) Write(b []byte) (int, error) { //nolint:varnamelen
+func (w *gzipResponseWriter) Write(b []byte) (int, error) {
 	if w.commitErr != nil {
 		return 0, w.commitErr
 	}
@@ -212,41 +212,65 @@ func (w *gzipResponseWriter) close() {
 	}
 }
 
+// hasZeroQuality reports whether the parameter string (after the first ";")
+// contains a quality value of zero (e.g. "q=0", "q=0.0", "q=0.000").
+func hasZeroQuality(params string) bool {
+	for param := range strings.SplitSeq(params, ";") {
+		param = strings.TrimSpace(param)
+
+		key, val, _ := strings.Cut(param, "=")
+		if strings.EqualFold(strings.TrimSpace(key), "q") {
+			qval, err := strconv.ParseFloat(strings.TrimSpace(val), 64)
+			if err == nil && qval == 0 {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // acceptsGzip checks whether the Accept-Encoding header includes gzip
-// with a non-zero quality value. It rejects quality values that parse to zero
-// (e.g. "gzip;q=0", "gzip;q=0.0", "gzip;q=0.000") which explicitly disable
-// gzip per RFC 7231. Encoding tokens are matched case-insensitively per RFC 7231.
+// with a non-zero quality value. It also handles the wildcard "*" token
+// per RFC 7231 Section 5.3.4, which matches any encoding not explicitly listed.
+// It rejects quality values that parse to zero (e.g. "gzip;q=0", "gzip;q=0.0",
+// "gzip;q=0.000") which explicitly disable gzip per RFC 7231.
+// Encoding tokens are matched case-insensitively per RFC 7231.
 func acceptsGzip(header string) bool {
+	gzipFound := false
+	gzipDisabled := false
+	wildcardFound := false
+	wildcardDisabled := false
+
 	for part := range strings.SplitSeq(header, ",") {
 		part = strings.TrimSpace(part)
 
 		encoding, params, _ := strings.Cut(part, ";")
 		encoding = strings.TrimSpace(encoding)
 
-		if !strings.EqualFold(encoding, "gzip") {
+		isGzip := strings.EqualFold(encoding, "gzip")
+		isWildcard := encoding == "*"
+
+		if !isGzip && !isWildcard {
 			continue
 		}
 
-		if params == "" {
-			return true
+		disabled := params != "" && hasZeroQuality(params)
+
+		if isGzip {
+			gzipFound = true
+			gzipDisabled = disabled
+		} else if isWildcard {
+			wildcardFound = true
+			wildcardDisabled = disabled
 		}
-
-		for param := range strings.SplitSeq(params, ";") {
-			param = strings.TrimSpace(param)
-
-			key, val, _ := strings.Cut(param, "=")
-			if strings.EqualFold(strings.TrimSpace(key), "q") {
-				qval, err := strconv.ParseFloat(strings.TrimSpace(val), 64)
-				if err == nil && qval == 0 {
-					return false
-				}
-			}
-		}
-
-		return true
 	}
 
-	return false
+	if gzipFound {
+		return !gzipDisabled
+	}
+
+	return wildcardFound && !wildcardDisabled
 }
 
 // Compress returns a middleware that compresses response bodies using gzip
@@ -254,7 +278,7 @@ func acceptsGzip(header string) bool {
 // for small responses (under 256 bytes) and already-compressed content types.
 func Compress() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:varnamelen
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Add("Vary", "Accept-Encoding")
 
 			if !acceptsGzip(r.Header.Get("Accept-Encoding")) {
@@ -263,7 +287,7 @@ func Compress() func(http.Handler) http.Handler {
 				return
 			}
 
-			gz, ok := gzipWriterPool.Get().(*gzip.Writer) //nolint:varnamelen
+			gz, ok := gzipWriterPool.Get().(*gzip.Writer)
 			if !ok {
 				next.ServeHTTP(w, r)
 
@@ -272,7 +296,7 @@ func Compress() func(http.Handler) http.Handler {
 
 			gz.Reset(w)
 
-			grw := &gzipResponseWriter{ //nolint:exhaustruct
+			grw := &gzipResponseWriter{
 				ResponseWriter: w,
 				gw:             gz,
 			}
