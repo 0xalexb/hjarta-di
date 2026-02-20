@@ -96,7 +96,7 @@ type DatabaseConfig struct {
 	Port     int    `yaml:"port"`
 	Name     string `yaml:"name"`
 	User     string `yaml:"user"`
-	Password string `yaml:"password"`
+	Password string `yaml:"password"` //nolint:gosec // G117: test struct, not a real secret
 }
 
 // TestYAMLParser_PathNavigation tests the production YAML parser with various path navigation scenarios.

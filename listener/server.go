@@ -44,7 +44,7 @@ func NewServer(name string, handler http.Handler, cfg Config, onServeErr func())
 	return &Server{
 		name:   name,
 		config: cfg,
-		server: &http.Server{ //nolint:exhaustruct // only relevant fields needed
+		server: &http.Server{
 			Addr:              cfg.Address,
 			Handler:           handler,
 			ReadHeaderTimeout: ReadHeaderTimeout,
@@ -56,7 +56,7 @@ func NewServer(name string, handler http.Handler, cfg Config, onServeErr func())
 
 // Start begins listening on TCP and serves HTTP requests in a background goroutine.
 func (s *Server) Start(ctx context.Context) error {
-	listenCfg := net.ListenConfig{} //nolint:exhaustruct // zero-value defaults are fine
+	listenCfg := net.ListenConfig{}
 
 	listener, err := listenCfg.Listen(ctx, "tcp", s.server.Addr)
 	if err != nil {

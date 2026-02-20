@@ -57,7 +57,7 @@ func TestServer_StartStop(t *testing.T) {
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://"+addr, nil)
 	require.NoError(t, err)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req) //nolint:gosec // G704: test code, URL from test server
 	require.NoError(t, err)
 
 	defer func() { _ = resp.Body.Close() }()
@@ -212,7 +212,7 @@ func TestServer_StopWithCancelledContext(t *testing.T) {
 			return
 		}
 
-		resp, doErr := http.DefaultClient.Do(req)
+		resp, doErr := http.DefaultClient.Do(req) //nolint:gosec // G704: test code, URL from test server
 		if doErr == nil {
 			_ = resp.Body.Close()
 		}
