@@ -53,8 +53,8 @@ func (tb *tokenBucket) tryAcquire() (bool, time.Duration) {
 // If requestsPerSecond is not positive, it defaults to 1.0 with a warning log.
 // If burst is not positive, it defaults to 1 with a warning log.
 func RateLimit(requestsPerSecond float64, burst int) func(http.Handler) http.Handler {
-	if requestsPerSecond <= 0 {
-		slog.Warn("middleware: requestsPerSecond must be positive, using default",
+	if math.IsNaN(requestsPerSecond) || math.IsInf(requestsPerSecond, 0) || requestsPerSecond <= 0 {
+		slog.Warn("middleware: requestsPerSecond must be a positive finite number, using default",
 			"provided", requestsPerSecond, "default", 1.0)
 
 		requestsPerSecond = 1.0

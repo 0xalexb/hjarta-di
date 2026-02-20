@@ -3,6 +3,7 @@ package middleware
 import (
 	"bytes"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -136,7 +137,7 @@ func TestRateLimit_DefaultsOnZeroRate(t *testing.T) { //nolint:paralleltest // u
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
-	assert.Contains(t, buf.String(), "requestsPerSecond must be positive")
+	assert.Contains(t, buf.String(), "requestsPerSecond must be a positive finite number")
 }
 
 func TestRateLimit_DefaultsOnNegativeRate(t *testing.T) { //nolint:paralleltest // uses shared rate limiter state
@@ -157,7 +158,7 @@ func TestRateLimit_DefaultsOnNegativeRate(t *testing.T) { //nolint:paralleltest 
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
-	assert.Contains(t, buf.String(), "requestsPerSecond must be positive")
+	assert.Contains(t, buf.String(), "requestsPerSecond must be a positive finite number")
 }
 
 func TestRateLimit_DefaultsOnZeroBurst(t *testing.T) { //nolint:paralleltest // uses shared rate limiter state
@@ -200,4 +201,46 @@ func TestRateLimit_DefaultsOnNegativeBurst(t *testing.T) { //nolint:paralleltest
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.Contains(t, buf.String(), "burst must be positive")
+}
+
+func TestRateLimit_DefaultsOnNaN(t *testing.T) { //nolint:paralleltest // uses shared rate limiter state
+	var buf bytes.Buffer
+
+	oldDefault := slog.Default()
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	slog.SetDefault(logger)
+
+	t.Cleanup(func() { slog.SetDefault(oldDefault) })
+
+	handler := RateLimit(math.NaN(), 1)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Contains(t, buf.String(), "requestsPerSecond must be a positive finite number")
+}
+
+func TestRateLimit_DefaultsOnInf(t *testing.T) { //nolint:paralleltest // uses shared rate limiter state
+	var buf bytes.Buffer
+
+	oldDefault := slog.Default()
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	slog.SetDefault(logger)
+
+	t.Cleanup(func() { slog.SetDefault(oldDefault) })
+
+	handler := RateLimit(math.Inf(1), 1)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Contains(t, buf.String(), "requestsPerSecond must be a positive finite number")
 }

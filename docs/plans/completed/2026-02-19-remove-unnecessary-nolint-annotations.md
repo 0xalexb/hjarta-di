@@ -1,5 +1,3 @@
----
-
 # Remove Unnecessary nolint Annotations
 
 ## Overview

@@ -77,7 +77,7 @@ Packages with distinct responsibilities:
 - Logging middlewares use global slog (via `slog.SetDefault` in di package)
 - Compatible with go-pkgz/routegroup for middleware composition
 - Available middlewares:
-  - `RequestID()` - generates 16-hex-char random request IDs via crypto/rand; reuses existing `X-Request-ID` header; stores in context via `GetRequestID(ctx)`
+  - `RequestID()` - generates 16-hex-char snowflake-like request IDs (41-bit ms timestamp since 2026-01-01 UTC, 16-bit FNV-1a machine hash, 7-bit sequence counter); spin-waits on sequence overflow (>127/ms) and clock-backward events to guarantee uniqueness and monotonicity; reuses existing `X-Request-ID` header; stores in context via `GetRequestID(ctx)`
   - `Recovery()` - catches panics, logs stack trace via slog.Error (includes request ID if available), returns 500
   - `Logging()` - logs method, path, status, duration, request ID; Info for 2xx/3xx, Warn for 4xx, Error for 5xx
   - `CORS(cfg CORSConfig)` - configurable CORS with preflight handling, origin matching, wildcard support, credentials flag; if AllowCredentials is true with only wildcard origins, disables credentials and logs slog.Warn
