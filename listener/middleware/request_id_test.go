@@ -114,11 +114,11 @@ func TestSnowflakeGenerator_SequenceIncrement(t *testing.T) {
 		ids[i] = gen.generate()
 	}
 
-	expectedTs := fixedTime.UnixMilli() - snowflakeEpochMs
+	expectedTS := fixedTime.UnixMilli() - snowflakeEpochMs
 
 	for i, id := range ids {
 		ts, _, seq := decodeSnowflakeID(t, id)
-		assert.Equal(t, expectedTs, ts, "all IDs should share the same timestamp")
+		assert.Equal(t, expectedTS, ts, "all IDs should share the same timestamp")
 		assert.Equal(t, uint64(i), seq, "sequence should increment: ID %d", i)
 	}
 }
