@@ -14,11 +14,12 @@ import (
 type OriginValidator func(origin string) error
 
 var (
-	errOriginHasScheme = errors.New("origin contains scheme (://)")
-	errOriginHasPath   = errors.New("origin contains path (/)")
-	errOriginHasPort   = errors.New("origin contains port")
-	errOriginIsWildcard = errors.New("origin is wildcard (*)")
-	errOriginIsEmpty   = errors.New("origin is empty")
+	errOriginHasScheme    = errors.New("origin contains scheme (://)")
+	errOriginMissingScheme = errors.New("origin missing scheme (://)")
+	errOriginHasPath      = errors.New("origin contains path (/)")
+	errOriginHasPort      = errors.New("origin contains port")
+	errOriginIsWildcard   = errors.New("origin is wildcard (*)")
+	errOriginIsEmpty      = errors.New("origin is empty")
 )
 
 const defaultCORSMaxAge = 3600
@@ -38,7 +39,13 @@ type corsConfig struct {
 type CORSOption func(*corsConfig)
 
 // WithAllowedOrigins sets the allowed origins, replacing defaults.
-// Origins are bare hostnames (e.g., "example.com") or "*" for wildcard.
+// Origins can be specified in two forms:
+//   - Full origins (e.g., "http://localhost:3000", "https://example.com") are matched
+//     exactly against the incoming Origin header (case-insensitive). Use this for strict,
+//     secure matching that distinguishes scheme and port.
+//   - Bare hostnames (e.g., "example.com", "localhost") match any scheme or port for
+//     that hostname, preserving backward compatibility.
+//   - "*" enables wildcard matching for all origins.
 func WithAllowedOrigins(origins ...string) CORSOption {
 	return func(c *corsConfig) {
 		c.allowedOrigins = origins
@@ -85,6 +92,12 @@ func WithOriginValidators(validators ...OriginValidator) CORSOption {
 	return func(c *corsConfig) {
 		c.validateOrigins = validators
 	}
+}
+
+// isFullOrigin returns true if the origin string contains a scheme (e.g., "http://example.com").
+// Bare hostnames (e.g., "example.com") return false.
+func isFullOrigin(origin string) bool {
+	return strings.Contains(origin, "://")
 }
 
 // extractHostname parses an origin URL and returns just the hostname.
@@ -162,6 +175,7 @@ func ValidateNotEmpty() OriginValidator {
 
 // ValidateHostname returns all hostname validators combined:
 // ValidateNoScheme, ValidateNoPath, ValidateNoPort, ValidateNoWildcard, ValidateNotEmpty.
+// Use this when all AllowedOrigins entries should be bare hostnames.
 func ValidateHostname() []OriginValidator {
 	return []OriginValidator{
 		ValidateNoScheme(),
@@ -169,6 +183,29 @@ func ValidateHostname() []OriginValidator {
 		ValidateNoPort(),
 		ValidateNoWildcard(),
 		ValidateNotEmpty(),
+	}
+}
+
+// ValidateHasScheme returns a validator that rejects origins missing a scheme ("://").
+// Use this to ensure entries are full origins, not bare hostnames.
+func ValidateHasScheme() OriginValidator {
+	return func(origin string) error {
+		if !strings.Contains(origin, "://") {
+			return errOriginMissingScheme
+		}
+
+		return nil
+	}
+}
+
+// ValidateFullOrigin returns validators for full-origin entries:
+// ValidateHasScheme, ValidateNotEmpty, ValidateNoWildcard.
+// Use this when all AllowedOrigins entries should be full origins (e.g., "https://example.com").
+func ValidateFullOrigin() []OriginValidator {
+	return []OriginValidator{
+		ValidateHasScheme(),
+		ValidateNotEmpty(),
+		ValidateNoWildcard(),
 	}
 }
 
@@ -191,8 +228,11 @@ func validateOrigin(origin string, validators []OriginValidator) bool {
 
 // CORS returns a middleware that handles Cross-Origin Resource Sharing.
 // It processes preflight OPTIONS requests and sets appropriate CORS headers.
-// AllowedOrigins entries are bare hostnames (e.g., "example.com"), and incoming
-// Origin headers are matched by extracting their hostname component.
+// AllowedOrigins entries can be full origins (e.g., "http://localhost:3000",
+// "https://example.com") matched exactly against the incoming Origin header
+// (case-insensitive), or bare hostnames (e.g., "example.com") matched against
+// the hostname extracted from Origin for looser matching. Full origins are
+// checked first, then bare hostnames as a fallback.
 // If AllowCredentials is true with only wildcard origins and no explicit origins,
 // credentials are automatically disabled and a warning is logged.
 //
@@ -214,32 +254,37 @@ func CORS(opts ...CORSOption) func(http.Handler) http.Handler { //nolint:gocogni
 		opt(cfg)
 	}
 
+	allowedFullOrigins := make(map[string]struct{}, len(cfg.allowedOrigins))
 	allowedHostnames := make(map[string]struct{}, len(cfg.allowedOrigins))
 	wildcard := false
 
-	for _, hostname := range cfg.allowedOrigins {
-		if valid := validateOrigin(hostname, cfg.validateOrigins); !valid {
+	for _, entry := range cfg.allowedOrigins {
+		if valid := validateOrigin(entry, cfg.validateOrigins); !valid {
 			continue
 		}
 
-		if hostname == "" {
+		if entry == "" {
 			continue
 		}
 
-		if hostname == "*" {
+		if entry == "*" {
 			wildcard = true
 
 			continue
 		}
 
-		allowedHostnames[strings.ToLower(hostname)] = struct{}{}
+		if isFullOrigin(entry) {
+			allowedFullOrigins[strings.ToLower(entry)] = struct{}{}
+		} else {
+			allowedHostnames[strings.ToLower(entry)] = struct{}{}
+		}
 	}
 
 	// When credentials are enabled, wildcard origin matching is disabled
 	// to prevent reflecting arbitrary origins with Access-Control-Allow-Credentials: true.
 	// Only explicitly listed (non-wildcard) origins are matched in this case.
 	if cfg.allowCredentials {
-		if wildcard && len(allowedHostnames) == 0 {
+		if wildcard && len(allowedHostnames) == 0 && len(allowedFullOrigins) == 0 {
 			slog.Warn("middleware: CORS AllowCredentials with only wildcard origin is invalid, disabling credentials")
 
 			cfg.allowCredentials = false
@@ -265,9 +310,16 @@ func CORS(opts ...CORSOption) func(http.Handler) http.Handler { //nolint:gocogni
 				return
 			}
 
-			hostname := strings.ToLower(extractHostname(origin))
+			originLower := strings.ToLower(origin)
 
-			_, matched := allowedHostnames[hostname]
+			// Check full origin match first, then fall back to hostname-based matching.
+			_, matched := allowedFullOrigins[originLower]
+			if !matched {
+				hostname := strings.ToLower(extractHostname(origin))
+
+				_, matched = allowedHostnames[hostname]
+			}
+
 			if !matched && !wildcard {
 				next.ServeHTTP(w, r)
 
