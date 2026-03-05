@@ -497,6 +497,39 @@ func TestCORS_ValidateOriginsRejectsIPv6Port(t *testing.T) { //nolint:parallelte
 	testValidateOriginsRejects(t, "[::1]:8080", "origin contains port")
 }
 
+func testCORSValidatorRejectsOrigin(
+	t *testing.T,
+	handler http.Handler,
+	logBuf *bytes.Buffer,
+	expectedLog string,
+	rejectedOrigin string,
+	acceptedOrigin string,
+) {
+	t.Helper()
+
+	assert.Contains(t, logBuf.String(), expectedLog)
+
+	// Rejected origin should NOT get CORS headers.
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Origin", rejectedOrigin)
+
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Empty(t, rec.Header().Get("Access-Control-Allow-Origin"))
+
+	// Accepted origin should work.
+	req2 := httptest.NewRequest(http.MethodGet, "/", nil)
+	req2.Header.Set("Origin", acceptedOrigin)
+
+	rec2 := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec2, req2)
+
+	assert.Equal(t, acceptedOrigin, rec2.Header().Get("Access-Control-Allow-Origin"))
+}
+
 func TestCORS_ValidateOriginsRejectsWildcard(t *testing.T) { //nolint:paralleltest // modifies global slog default
 	var buf bytes.Buffer
 
@@ -511,28 +544,8 @@ func TestCORS_ValidateOriginsRejectsWildcard(t *testing.T) { //nolint:parallelte
 		WithOriginValidators(ValidateNoWildcard()),
 	)(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 
-	// ValidateNoWildcard should reject "*" and log an error.
-	assert.Contains(t, buf.String(), "origin is wildcard")
-
-	// Wildcard should NOT work since "*" was rejected by the validator.
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.Header.Set("Origin", "https://any.com")
-
-	rec := httptest.NewRecorder()
-
-	handler.ServeHTTP(rec, req)
-
-	assert.Empty(t, rec.Header().Get("Access-Control-Allow-Origin"))
-
-	// But good.com should still work.
-	req2 := httptest.NewRequest(http.MethodGet, "/", nil)
-	req2.Header.Set("Origin", "https://good.com")
-
-	rec2 := httptest.NewRecorder()
-
-	handler.ServeHTTP(rec2, req2)
-
-	assert.Equal(t, "https://good.com", rec2.Header().Get("Access-Control-Allow-Origin"))
+	testCORSValidatorRejectsOrigin(t, handler, &buf,
+		"origin is wildcard", "https://any.com", "https://good.com")
 }
 
 func TestCORS_ValidateOriginsPassesValid(t *testing.T) { //nolint:paralleltest // modifies global slog default
@@ -582,8 +595,7 @@ func TestCORS_NoValidation(t *testing.T) { //nolint:paralleltest // modifies glo
 	// Without validators, entries with schemes/ports are added as-is (no error logs).
 	assert.Empty(t, buf.String())
 
-	// These entries won't match via hostname extraction because the map keys
-	// are full strings, not bare hostnames extracted from Origin headers.
+	// "https://example.com" is a full origin (contains "://") and is matched exactly.
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Origin", "https://example.com")
 
@@ -591,9 +603,12 @@ func TestCORS_NoValidation(t *testing.T) { //nolint:paralleltest // modifies glo
 
 	handler.ServeHTTP(rec, req)
 
-	assert.Empty(t, rec.Header().Get("Access-Control-Allow-Origin"),
-		"https://example.com should not match map key 'https://example.com' via hostname extraction")
+	assert.Equal(t, "https://example.com", rec.Header().Get("Access-Control-Allow-Origin"),
+		"full origin 'https://example.com' should match exactly")
 
+	// "localhost:8080" does not contain "://" so it's treated as a bare hostname.
+	// Hostname extraction from "http://localhost:8080" yields "localhost", which
+	// doesn't match the map key "localhost:8080".
 	req2 := httptest.NewRequest(http.MethodGet, "/", nil)
 	req2.Header.Set("Origin", "http://localhost:8080")
 
@@ -602,7 +617,7 @@ func TestCORS_NoValidation(t *testing.T) { //nolint:paralleltest // modifies glo
 	handler.ServeHTTP(rec2, req2)
 
 	assert.Empty(t, rec2.Header().Get("Access-Control-Allow-Origin"),
-		"http://localhost:8080 should not match map key 'localhost:8080' via hostname extraction")
+		"http://localhost:8080 should not match bare hostname key 'localhost:8080'")
 }
 
 func testValidateOriginsRejects(t *testing.T, invalidOrigin, expectedLog string) {
@@ -804,4 +819,224 @@ func TestCORS_EmptyAllowedOrigins(t *testing.T) {
 
 	require.True(t, nextCalled)
 	assert.Empty(t, rec.Header().Get("Access-Control-Allow-Origin"))
+}
+
+func TestCORS_FullOriginExactMatch(t *testing.T) {
+	t.Parallel()
+
+	handler := CORS(
+		WithAllowedOrigins("http://localhost:3000"),
+	)(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+
+	// Exact match should work.
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Origin", "http://localhost:3000")
+
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, "http://localhost:3000", rec.Header().Get("Access-Control-Allow-Origin"))
+}
+
+func TestCORS_FullOriginRejectsDifferentPort(t *testing.T) {
+	t.Parallel()
+
+	handler := CORS(
+		WithAllowedOrigins("http://localhost:3000"),
+	)(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+
+	// Different port should NOT match.
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Origin", "http://localhost:9999")
+
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Empty(t, rec.Header().Get("Access-Control-Allow-Origin"),
+		"http://localhost:9999 should not match full origin http://localhost:3000")
+}
+
+func TestCORS_FullOriginRejectsDifferentScheme(t *testing.T) {
+	t.Parallel()
+
+	handler := CORS(
+		WithAllowedOrigins("http://example.com"),
+	)(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+
+	// Different scheme should NOT match.
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Origin", "https://example.com")
+
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Empty(t, rec.Header().Get("Access-Control-Allow-Origin"),
+		"https://example.com should not match full origin http://example.com")
+}
+
+func TestCORS_FullOriginCaseInsensitive(t *testing.T) {
+	t.Parallel()
+
+	handler := CORS(
+		WithAllowedOrigins("HTTP://Example.COM:3000"),
+	)(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Origin", "http://example.com:3000")
+
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, "http://example.com:3000", rec.Header().Get("Access-Control-Allow-Origin"),
+		"full origin matching should be case-insensitive")
+}
+
+func TestCORS_MixedFullOriginAndBareHostname(t *testing.T) {
+	t.Parallel()
+
+	handler := CORS(
+		WithAllowedOrigins("http://localhost:3000", "example.com"),
+	)(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+
+	// Full origin match.
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Origin", "http://localhost:3000")
+
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, "http://localhost:3000", rec.Header().Get("Access-Control-Allow-Origin"))
+
+	// Bare hostname match (any scheme/port).
+	req2 := httptest.NewRequest(http.MethodGet, "/", nil)
+	req2.Header.Set("Origin", "https://example.com")
+
+	rec2 := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec2, req2)
+
+	assert.Equal(t, "https://example.com", rec2.Header().Get("Access-Control-Allow-Origin"))
+
+	// Full origin with different port should NOT match (no bare "localhost" entry).
+	req3 := httptest.NewRequest(http.MethodGet, "/", nil)
+	req3.Header.Set("Origin", "http://localhost:9999")
+
+	rec3 := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec3, req3)
+
+	assert.Empty(t, rec3.Header().Get("Access-Control-Allow-Origin"),
+		"http://localhost:9999 should not match when only http://localhost:3000 is allowed")
+
+	// Unrelated origin should NOT match.
+	req4 := httptest.NewRequest(http.MethodGet, "/", nil)
+	req4.Header.Set("Origin", "https://evil.com")
+
+	rec4 := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec4, req4)
+
+	assert.Empty(t, rec4.Header().Get("Access-Control-Allow-Origin"))
+}
+
+func TestCORS_FullOriginPreflight(t *testing.T) {
+	t.Parallel()
+
+	handler := CORS(
+		WithAllowedOrigins("https://app.example.com:8443"),
+		WithAllowedMethods("GET", "POST"),
+	)(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		t.Error("handler should not be called for preflight")
+	}))
+
+	req := httptest.NewRequest(http.MethodOptions, "/api", nil)
+	req.Header.Set("Origin", "https://app.example.com:8443")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusNoContent, rec.Code)
+	assert.Equal(t, "https://app.example.com:8443", rec.Header().Get("Access-Control-Allow-Origin"))
+	assert.Equal(t, "GET, POST", rec.Header().Get("Access-Control-Allow-Methods"))
+}
+
+func TestCORS_FullOriginWithCredentials(t *testing.T) {
+	t.Parallel()
+
+	handler := CORS(
+		WithAllowedOrigins("https://app.example.com"),
+		WithAllowCredentials(),
+	)(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Origin", "https://app.example.com")
+
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, "https://app.example.com", rec.Header().Get("Access-Control-Allow-Origin"))
+	assert.Equal(t, "true", rec.Header().Get("Access-Control-Allow-Credentials"))
+}
+
+func TestCORS_ValidateFullOriginRejectsBareHostname(t *testing.T) { //nolint:paralleltest // global slog
+	var buf bytes.Buffer
+
+	oldDefault := slog.Default()
+
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+
+	t.Cleanup(func() { slog.SetDefault(oldDefault) })
+
+	handler := CORS(
+		WithAllowedOrigins("example.com", "https://good.com"),
+		WithOriginValidators(ValidateFullOrigin()...),
+	)(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+
+	testCORSValidatorRejectsOrigin(t, handler, &buf,
+		"origin missing scheme", "https://example.com", "https://good.com")
+}
+
+func TestCORS_ValidateHasScheme(t *testing.T) {
+	t.Parallel()
+
+	v := ValidateHasScheme()
+
+	assert.NoError(t, v("https://example.com"))
+	assert.NoError(t, v("http://localhost:3000"))
+	require.ErrorIs(t, v("example.com"), errOriginMissingScheme)
+	require.ErrorIs(t, v("localhost"), errOriginMissingScheme)
+}
+
+func TestCORS_BareHostnameStillMatchesDifferentPorts(t *testing.T) {
+	t.Parallel()
+
+	// Bare hostname "localhost" should match any port (backward compatibility).
+	handler := CORS(
+		WithAllowedOrigins("localhost"),
+	)(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+
+	for _, origin := range []string{
+		"http://localhost",
+		"http://localhost:3000",
+		"http://localhost:8080",
+		"https://localhost:443",
+	} {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Origin", origin)
+
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		assert.Equal(t, origin, rec.Header().Get("Access-Control-Allow-Origin"),
+			"bare hostname 'localhost' should match %s", origin)
+	}
 }
